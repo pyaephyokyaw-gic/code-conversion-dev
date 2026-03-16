@@ -34,7 +34,7 @@ def resp(status, body):
     }
 
 def s3_url(key):
-    return f"https://{S3_BUCKET}.s3.{AWS_REGION}.amazonaws.com/{key}"
+    return f"s3://{S3_BUCKET}/{key}"
 
 def presigned_put(key, expires=3600):
     return s3.generate_presigned_url(
@@ -44,8 +44,7 @@ def presigned_put(key, expires=3600):
     )
 
 def make_key(org_id, filename):
-    ts = datetime.utcnow().strftime("%Y%m%d%H%M%S")
-    return f"prompts/{org_id}/{ts}_{filename}"
+    return filename
 
 
 # ── CRUD handlers ─────────────────────────────────────────────────────────────
@@ -56,28 +55,42 @@ def create_prompt(body):
     if not org_id:
         return resp(400, {"error": "organization_id is required"})
 
-    name        = body.get("prompt_name")
-    description = body.get("prompt_description")
-    filename    = body.get("file_name")          # optional, e.g. "system_prompt.txt"
+    name         = body.get("prompt_name")
+    description  = body.get("prompt_description")
+    filename     = body.get("file_name")        # e.g. "prompt-4.txt"
+    content      = body.get("prompt_content")   # actual text content to upload
 
-    file_url     = None
-    upload_url   = None
-    if filename:
-        key        = make_key(org_id, filename)
-        file_url   = s3_url(key)
-        upload_url = presigned_put(key)
+    file_url = None
+    if filename and content:
+        key = make_key(org_id, filename)
+        try:
+            s3.put_object(
+                Bucket=S3_BUCKET,
+                Key=key,
+                Body=content.encode("utf-8"),
+                ContentType="text/plain",
+            )
+            file_url = s3_url(key)
+        except Exception as e:
+            return resp(500, {"error": f"S3 upload failed: {str(e)}"})
+    elif filename and not content:
+        # No content provided — just reserve the URL (client uploads later)
+        key      = make_key(org_id, filename)
+        file_url = s3_url(key)
 
     conn = get_conn()
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM prompts")
+            next_id = cur.fetchone()["next_id"]
             cur.execute(
                 """
                 INSERT INTO prompts
-                    (organization_id, prompt_name, prompt_description, prompt_file_url, created_at)
-                VALUES (%s, %s, %s, %s, %s)
+                    (id, organization_id, prompt_name, prompt_description, prompt_file_url, created_at)
+                VALUES (%s, %s, %s, %s, %s, %s)
                 RETURNING *
                 """,
-                (org_id, name, description, file_url, datetime.utcnow()),
+                (next_id, org_id, name, description, file_url, datetime.utcnow()),
             )
             prompt = dict(cur.fetchone())
         conn.commit()
@@ -87,13 +100,7 @@ def create_prompt(body):
     finally:
         conn.close()
 
-    result = {"prompt": prompt}
-    if upload_url:
-        result["upload_url"] = upload_url
-        result["message"] = (
-            "File record saved. PUT your file binary to upload_url to store it in S3."
-        )
-    return resp(201, result)
+    return resp(201, {"prompt": prompt})
 
 
 def list_prompts(query_params):
@@ -138,23 +145,43 @@ def update_prompt(prompt_id, body):
     name        = body.get("prompt_name")
     description = body.get("prompt_description")
     filename    = body.get("file_name")
+    content     = body.get("prompt_content")
 
-    file_url   = None
-    upload_url = None
+    file_url = None
 
     conn = get_conn()
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            # Verify prompt exists and get org_id for S3 key
-            cur.execute("SELECT id, organization_id FROM prompts WHERE id = %s", (prompt_id,))
+            cur.execute("SELECT id, organization_id, prompt_file_url FROM prompts WHERE id = %s", (prompt_id,))
             existing = cur.fetchone()
             if not existing:
                 return resp(404, {"error": f"Prompt {prompt_id} not found"})
 
-            if filename:
-                key        = make_key(existing["organization_id"], filename)
-                file_url   = s3_url(key)
-                upload_url = presigned_put(key)
+            old_file_url = existing["prompt_file_url"]
+
+            if filename and content:
+                key = make_key(existing["organization_id"], filename)
+                # Always delete old S3 file first (if exists)
+                if old_file_url:
+                    try:
+                        old_key = old_file_url.split(f"s3://{S3_BUCKET}/")[1]
+                        s3.delete_object(Bucket=S3_BUCKET, Key=old_key)
+                    except Exception as e:
+                        return resp(500, {"error": f"S3 delete old file failed: {str(e)}"})
+                # Upload new file
+                try:
+                    s3.put_object(
+                        Bucket=S3_BUCKET,
+                        Key=key,
+                        Body=content.encode("utf-8"),
+                        ContentType="text/plain",
+                    )
+                    file_url = s3_url(key)
+                except Exception as e:
+                    return resp(500, {"error": f"S3 upload failed: {str(e)}"})
+            elif filename and not content:
+                key      = make_key(existing["organization_id"], filename)
+                file_url = s3_url(key)
 
             if file_url:
                 cur.execute(
@@ -187,11 +214,7 @@ def update_prompt(prompt_id, body):
     finally:
         conn.close()
 
-    result = {"prompt": updated}
-    if upload_url:
-        result["upload_url"] = upload_url
-        result["message"] = "PUT your file binary to upload_url to replace the file in S3."
-    return resp(200, result)
+    return resp(200, {"prompt": updated})
 
 
 def delete_prompt(prompt_id):
@@ -204,20 +227,17 @@ def delete_prompt(prompt_id):
             if not row:
                 return resp(404, {"error": f"Prompt {prompt_id} not found"})
 
-            # Best-effort S3 deletion
             file_url = dict(row).get("prompt_file_url")
             if file_url:
                 try:
-                    key = file_url.split(
-                        f"{S3_BUCKET}.s3.{AWS_REGION}.amazonaws.com/"
-                    )[1]
+                    key = file_url.split(f"s3://{S3_BUCKET}/")[1]
                     s3.delete_object(Bucket=S3_BUCKET, Key=key)
-                except Exception:
-                    pass  # Do not fail the delete if S3 removal errors
+                except Exception as e:
+                    return resp(500, {"error": f"S3 delete failed: {str(e)}"})
 
             cur.execute("DELETE FROM prompts WHERE id = %s", (prompt_id,))
         conn.commit()
-        return resp(200, {"message": f"Prompt {prompt_id} deleted successfully"})
+        return resp(200, {"message": f"Prompt {prompt_id} and S3 file deleted successfully"})
     except Exception as e:
         conn.rollback()
         return resp(500, {"error": str(e)})
