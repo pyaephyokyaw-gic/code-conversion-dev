@@ -1,0 +1,129 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: SAM Template for Multi-Lambda with case-sensitive handler fix
+
+Globals:
+  Function:
+    Runtime: python3.11
+    # Matches your filename 'Lambda_function.py'
+    Handler: Lambda_function.lambda_handler
+    Timeout: 30
+
+Parameters:
+  DBHost:
+    Type: String
+    Default: host.docker.internal
+    Description: PostgreSQL host
+  DBName:
+    Type: String
+    Default: postgres
+    Description: PostgreSQL database name
+  DBUser:
+    Type: String
+    Default: postgres
+    Description: PostgreSQL user
+  DBPassword:
+    Type: String
+    NoEcho: true
+    Default: postgres
+    Description: PostgreSQL password
+  DBPort:
+    Type: String
+    Default: '5432'
+  S3BucketName:
+    Type: String
+    Default: code-conversion-prompt-test
+    Description: S3 bucket name for prompt files
+
+Resources:
+
+  # ── S3 bucket for prompt files ──────────────────────────────────────────────
+  PromptFilesBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub ojt-prompt-files-${AWS::AccountId}-${AWS::Region}
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders:
+              - '*'
+            AllowedMethods:
+              - GET
+              - PUT
+              - HEAD
+            AllowedOrigins:
+              - '*'
+            MaxAge: 3000
+
+  UserFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: ojt-user-management-dev
+      CodeUri: user_management/
+
+  CompanyFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: ojt-company-management-dev
+      CodeUri: company_management/
+
+  OrganizationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: ojt-organization-management-dev
+      CodeUri: organization_management/
+
+  PromptFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: ojt-prompt-management-dev
+      CodeUri: prompt_management/
+      Handler: lambda_function.lambda_handler # override global (lowercase file)
+      Policies:
+        - S3CrudPolicy:
+            BucketName: !Ref S3BucketName
+      Environment:
+        Variables:
+          DB_HOST: !Ref DBHost
+          DB_NAME: !Ref DBName
+          DB_USER: !Ref DBUser
+          DB_PASSWORD: !Ref DBPassword
+          DB_PORT: !Ref DBPort
+          S3_BUCKET_NAME: !Ref S3BucketName
+          AWS_REGION_NAME: !Ref AWS::Region
+      Events:
+        CreatePrompt:
+          Type: Api
+          Properties:
+            Path: /prompts
+            Method: POST
+        ListPrompts:
+          Type: Api
+          Properties:
+            Path: /prompts
+            Method: GET
+        GetPrompt:
+          Type: Api
+          Properties:
+            Path: /prompts/{id}
+            Method: GET
+        UpdatePrompt:
+          Type: Api
+          Properties:
+            Path: /prompts/{id}
+            Method: PUT
+        DeletePrompt:
+          Type: Api
+          Properties:
+            Path: /prompts/{id}
+            Method: DELETE
+        GetPromptUploadUrl:
+          Type: Api
+          Properties:
+            Path: /prompts/{id}/upload-url
+            Method: GET
+
+  ConversionFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: ojt-conversion-management-dev
+      CodeUri: conversion_management/
