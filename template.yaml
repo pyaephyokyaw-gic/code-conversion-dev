@@ -91,6 +91,7 @@ Resources:
           S3_BUCKET_NAME: !Ref S3BucketName
           AWS_REGION_NAME: !Ref AWS::Region
       Events:
+        # Prompt CRUD
         CreatePrompt:
           Type: Api
           Properties:
@@ -104,22 +105,49 @@ Resources:
         GetPrompt:
           Type: Api
           Properties:
-            Path: /prompts/{id}
+            Path: /prompts/{prompt_id}
             Method: GET
         UpdatePrompt:
           Type: Api
           Properties:
-            Path: /prompts/{id}
+            Path: /prompts/{prompt_id}
             Method: PUT
         DeletePrompt:
           Type: Api
           Properties:
-            Path: /prompts/{id}
+            Path: /prompts/{prompt_id}
             Method: DELETE
+        # File operations
         GetPromptUploadUrl:
           Type: Api
           Properties:
-            Path: /prompts/{id}/upload-url
+            Path: /prompts/{prompt_id}/upload-url
+            Method: GET
+        GetPromptFileContent:
+          Type: Api
+          Properties:
+            Path: /prompts/{prompt_id}/file-content
+            Method: GET
+        # Dropdown APIs
+        ListOrganizations:
+          Type: Api
+          Properties:
+            Path: /prompts/organizations
+            Method: GET
+        ListCompanies:
+          Type: Api
+          Properties:
+            Path: /prompts/companies
+            Method: GET
+        ListInputExtensions:
+          Type: Api
+          Properties:
+            Path: /prompts/input-extensions
+            Method: GET
+        ListOutputExtensions:
+          Type: Api
+          Properties:
+            Path: /prompts/output-extensions
             Method: GET
 
   ConversionFunction:
