@@ -10,19 +10,12 @@ API Routes:
 - DELETE /prompts/{prompt_id}               - Delete prompt
 - GET    /prompts/{prompt_id}/upload-url    - Get presigned upload URL
 - GET    /prompts/{prompt_id}/file-content  - Get file content for preview
-- GET    /prompts/organizations             - List organizations (dropdown)
-- GET    /prompts/companies                 - List companies (dropdown)
-- GET    /prompts/input-extensions          - List input extensions (dropdown)
-- GET    /prompts/output-extensions         - List output extensions (dropdown)
 """
 import json
 from controllers.prompt_controller import (
     handle_create, handle_list, handle_get, handle_update,
     handle_delete, handle_upload_url, handle_file_content
 )
-from controllers.organization_controller import handle_list_organizations
-from controllers.company_controller import handle_list_companies
-from controllers.file_extension_controller import handle_list_all, handle_list_input, handle_list_output
 from models.response import error, not_found
 
 
@@ -41,24 +34,6 @@ def lambda_handler(event, context):
             return error("Invalid JSON body")
 
     prompt_id = path_params.get("prompt_id")
-
-    # ── Dropdown routes ───────────────────────────────────────────────────────
-
-    # GET /prompts/organizations
-    if method == "GET" and path.endswith("/organizations"):
-        return handle_list_organizations(query_params)
-
-    # GET /prompts/companies
-    if method == "GET" and path.endswith("/companies"):
-        return handle_list_companies(query_params)
-
-    # GET /prompts/input-extensions
-    if method == "GET" and path.endswith("/input-extensions"):
-        return handle_list_input(query_params)
-
-    # GET /prompts/output-extensions
-    if method == "GET" and path.endswith("/output-extensions"):
-        return handle_list_output(query_params)
 
     # ── Prompt sub-resource routes ────────────────────────────────────────────
 

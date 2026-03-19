@@ -1,2 +1,0 @@
--- Database setup for prompt management
--- Note: file_extensions are handled as static list in code (no table needed)
