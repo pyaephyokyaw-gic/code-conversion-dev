@@ -268,3 +268,137 @@ def list_prompts_grouped(org_id=None, company_id=None, search=None, page=1, limi
         return {"total_prompts": total_prompts, "organizations": grouped_list}
     finally:
         conn.close()
+
+
+def get_prompt_types_by_company(company_id):
+    """Get distinct prompt types (prompt_name with file types) for a company."""
+    conn = get_connection()
+    try:
+        with get_dict_cursor(conn) as cur:
+            cur.execute(
+                """
+                SELECT DISTINCT
+                    p.id,
+                    p.prompt_name,
+                    p.prompt_description,
+                    p.input_file_type,
+                    p.output_file_type
+                FROM prompts p
+                WHERE p.company_id = %s
+                ORDER BY p.prompt_name
+                """,
+                (company_id,),
+            )
+            return [dict(r) for r in cur.fetchall()]
+    finally:
+        conn.close()
+
+
+def get_all_prompt_types():
+    """Get all distinct prompt types - for super_admin."""
+    conn = get_connection()
+    try:
+        with get_dict_cursor(conn) as cur:
+            cur.execute(
+                """
+                SELECT DISTINCT
+                    p.id,
+                    p.prompt_name,
+                    p.prompt_description,
+                    p.input_file_type,
+                    p.output_file_type,
+                    c.id AS company_id,
+                    c.name AS company_name,
+                    o.id AS organization_id,
+                    o.name AS organization_name
+                FROM prompts p
+                JOIN company c ON c.id = p.company_id
+                JOIN organizations o ON o.id = p.organization_id
+                ORDER BY o.name, c.name, p.prompt_name
+                """
+            )
+            return [dict(r) for r in cur.fetchall()]
+    finally:
+        conn.close()
+
+
+def get_prompt_types_by_organization(organization_id):
+    """Get distinct prompt types for an organization."""
+    conn = get_connection()
+    try:
+        with get_dict_cursor(conn) as cur:
+            cur.execute(
+                """
+                SELECT DISTINCT
+                    p.id,
+                    p.prompt_name,
+                    p.prompt_description,
+                    p.input_file_type,
+                    p.output_file_type,
+                    c.id AS company_id,
+                    c.name AS company_name
+                FROM prompts p
+                JOIN company c ON c.id = p.company_id
+                WHERE p.organization_id = %s
+                ORDER BY c.name, p.prompt_name
+                """,
+                (organization_id,),
+            )
+            return [dict(r) for r in cur.fetchall()]
+    finally:
+        conn.close()
+
+
+def list_prompts_by_company(company_id, search=None, page=1, limit=5):
+    """List prompts for a specific company with pagination - for members."""
+    offset = (page - 1) * limit
+    
+    where = "WHERE p.company_id = %s"
+    params = [company_id]
+    
+    if search:
+        where += " AND p.prompt_name ILIKE %s"
+        params.append(f"%{search}%")
+    
+    conn = get_connection()
+    try:
+        with get_dict_cursor(conn) as cur:
+            # Get total count
+            cur.execute(f"""
+                SELECT COUNT(*) AS total
+                FROM prompts p
+                {where}
+            """, params)
+            total = cur.fetchone()["total"]
+            
+            # Get paginated prompts
+            cur.execute(f"""
+                SELECT
+                    p.id,
+                    p.prompt_name,
+                    p.prompt_description,
+                    p.input_file_type,
+                    p.output_file_type,
+                    p.prompt_file_url,
+                    p.created_at,
+                    p.organization_id,
+                    p.company_id,
+                    COUNT(cv.id) AS usage_count
+                FROM prompts p
+                LEFT JOIN conversions cv ON cv.prompt_id = p.id
+                {where}
+                GROUP BY p.id
+                ORDER BY p.created_at DESC
+                LIMIT %s OFFSET %s
+            """, params + [limit, offset])
+            prompts = [dict(r) for r in cur.fetchall()]
+            
+            return {
+                "total": total,
+                "page": page,
+                "limit": limit,
+                "total_pages": -(-total // limit) if total > 0 else 0,
+                "prompts": prompts
+            }
+    finally:
+        conn.close()
