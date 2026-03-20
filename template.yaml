@@ -27,12 +27,110 @@ Resources:
     Properties:
       FunctionName: ojt-organization-management-dev
       CodeUri: organization_management/
+      Handler: lambda_function.lambda_handler
+      Environment:
+        Variables:
+          DB_HOST: !Ref DBHost
+          DB_NAME: !Ref DBName
+          DB_USER: !Ref DBUser
+          DB_PASSWORD: !Ref DBPassword
+          DB_PORT: !Ref DBPort
+      Events:
+        # Organization CRUD
+        CreateOrganization:
+          Type: Api
+          Properties:
+            Path: /organizations
+            Method: POST
+        ListOrganizations:
+          Type: Api
+          Properties:
+            Path: /organizations
+            Method: GET
+        GetOrganization:
+          Type: Api
+          Properties:
+            Path: /organizations/{org_id}
+            Method: GET
+        UpdateOrganization:
+          Type: Api
+          Properties:
+            Path: /organizations/{org_id}
+            Method: PUT
+        DeleteOrganization:
+          Type: Api
+          Properties:
+            Path: /organizations/{org_id}
+            Method: DELETE
+        # Dropdown API
+        OrganizationDropdown:
+          Type: Api
+          Properties:
+            Path: /organizations/dropdown
+            Method: GET
 
   PromptFunction:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: ojt-prompt-management-dev
       CodeUri: prompt_management/
+      Handler: lambda_function.lambda_handler # override global (lowercase file)
+      Policies:
+        - S3CrudPolicy:
+            BucketName: !Ref S3BucketName
+      Environment:
+        Variables:
+          DB_HOST: !Ref DBHost
+          DB_NAME: !Ref DBName
+          DB_USER: !Ref DBUser
+          DB_PASSWORD: !Ref DBPassword
+          DB_PORT: !Ref DBPort
+          S3_BUCKET_NAME: !Ref S3BucketName
+          AWS_REGION_NAME: !Ref AWS::Region
+      Events:
+        # Prompt CRUD
+        CreatePrompt:
+          Type: Api
+          Properties:
+            Path: /prompts
+            Method: POST
+        ListPrompts:
+          Type: Api
+          Properties:
+            Path: /prompts
+            Method: GET
+        GetPrompt:
+          Type: Api
+          Properties:
+            Path: /prompts/{prompt_id}
+            Method: GET
+        UpdatePrompt:
+          Type: Api
+          Properties:
+            Path: /prompts/{prompt_id}
+            Method: PUT
+        DeletePrompt:
+          Type: Api
+          Properties:
+            Path: /prompts/{prompt_id}
+            Method: DELETE
+        # File operations
+        GetPromptUploadUrl:
+          Type: Api
+          Properties:
+            Path: /prompts/{prompt_id}/upload-url
+            Method: GET
+        GetPromptFileContent:
+          Type: Api
+          Properties:
+            Path: /prompts/{prompt_id}/file-content
+            Method: GET
+        # Dropdown API
+        GetPromptTypesDropdown:
+          Type: Api
+          Properties:
+            Path: /prompts/types
+            Method: GET
 
   ConversionFunction:
     Type: AWS::Serverless::Function
