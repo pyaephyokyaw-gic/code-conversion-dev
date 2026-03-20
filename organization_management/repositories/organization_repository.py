@@ -111,15 +111,12 @@ def delete_organization(org_id):
         conn.close()
 
 
-def list_organizations(search=None, page=1, limit=10, organization_id=None):
+def list_organizations(search=None, page=1, limit=10):
     """List organizations with search and pagination."""
     offset = (page - 1) * limit
     
     where = "WHERE 1=1"
     params = []
-    if organization_id:
-        where += " AND o.id = %s"
-        params.append(organization_id)
     if search:
         where += " AND o.name ILIKE %s"
         params.append(f"%{search}%")
@@ -168,23 +165,6 @@ def find_all_organizations():
     try:
         with get_dict_cursor(conn) as cur:
             cur.execute("SELECT id, name FROM organizations ORDER BY name")
-            return [dict(r) for r in cur.fetchall()]
-    finally:
-        conn.close()
-
-
-def find_organizations_by_ids(org_ids):
-    """Get organizations by IDs for dropdown."""
-    if not org_ids:
-        return []
-    conn = get_connection()
-    try:
-        with get_dict_cursor(conn) as cur:
-            placeholders = ','.join(['%s'] * len(org_ids))
-            cur.execute(
-                f"SELECT id, name FROM organizations WHERE id IN ({placeholders}) ORDER BY name",
-                tuple(org_ids),
-            )
             return [dict(r) for r in cur.fetchall()]
     finally:
         conn.close()

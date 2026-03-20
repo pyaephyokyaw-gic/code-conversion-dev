@@ -44,11 +44,6 @@ def forbidden(message="Access forbidden"):
     return resp(403, {"error": message})
 
 
-def unauthorized(message="Unauthorized"):
-    """Return a 401 Unauthorized response."""
-    return resp(401, {"error": message})
-
-
 def server_error(message="Internal server error"):
     """Return a 500 Internal Server Error response."""
     return resp(500, {"error": message})

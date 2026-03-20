@@ -169,12 +169,6 @@ Resources:
           Properties:
             Path: /prompts/{prompt_id}/file-content
             Method: GET
-        # Dropdown API
-        GetPromptTypesDropdown:
-          Type: Api
-          Properties:
-            Path: /prompts/types
-            Method: GET
 
   ConversionFunction:
     Type: AWS::Serverless::Function
