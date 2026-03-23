@@ -1,18 +1,27 @@
 # main.py
-from fastapi import FastAPI
-from sqlalchemy.ext.asyncio import AsyncSession
-from models.organization import Org
+from fastapi import FastAPI, Request
+from conversion_management.lambda_function import lambda_handler
+
 app = FastAPI()
 
 
-# @app.get("/")
-# async def root():
-#     return {"status": "Application is running without checking DB schema."}
+@app.api_route("/{path:path}", methods=["GET", "POST"])
+async def proxy(request: Request, path: str):
+    body = await request.body()
 
+    event = {
+        "path": "/" + path,
+        "httpMethod": request.method,
+        "headers": dict(request.headers),
+        "queryStringParameters": dict(request.query_params),
+        "body": body.decode("utf-8") if body else None,
+        "requestContext": {
+            "http": {
+                "method": request.method
+            }
+        }
+    }
 
-# @app.post("/insert")
-# async def create_org(name: str, db: AsyncSession = Depends(get_db)):
-#     new_org = Org(name=name)
-#     db.add(new_org)
-#     await db.commit()
-#     return new_org
+    response = lambda_handler(event, None)
+
+    return response

@@ -5,15 +5,12 @@ python-jose[cryptography]
 fastapi
 uvicorn[standard]
 
-# python adapter
-mangum
-
 # Database Toolkit (ORM)
 sqlalchemy>=2.0.0
-
-# Async PostgreSQL Driver
-asyncpg
 
 # Environment Variable Management
 python-dotenv
 pydantic-settings
+
+psycopg2-binary
+boto3

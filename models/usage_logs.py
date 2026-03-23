@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy import Integer, String, ForeignKey, DateTime
+from sqlalchemy import Integer, func, ForeignKey, DateTime
 from datetime import datetime
 from .base import Base
 
@@ -14,4 +14,4 @@ class UsageLog(Base):
     total_tokens: Mapped[int] = mapped_column(Integer, nullable=False)
     total_credits: Mapped[int] = mapped_column(Integer, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=datetime.now)
+        DateTime, server_default=func.now())

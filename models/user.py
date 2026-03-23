@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy import String, DateTime, ForeignKey, Enum as SQLEnum
+from sqlalchemy import String, DateTime, ForeignKey, func, Enum as SQLEnum
 from datetime import datetime
 from .base import Base
 from common.user_role import UserRole
@@ -21,7 +21,7 @@ class User(Base):
     role: Mapped[int] = mapped_column(
         SQLEnum(UserRole, name="user_role"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=datetime.now())
+        DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=datetime.now(), onupdate=datetime.now())
+        DateTime, server_default=func.now(), onupdate=func.now())
     deleted_at: Mapped[datetime] = mapped_column(DateTime, nullable=True)

@@ -3,7 +3,7 @@ Organization Controller
 Handles HTTP request/response for organization operations
 No business logic here - only validates request and calls service
 """
-from models.response import success, created, error, not_found, server_error, forbidden
+from models.response import success, created, error, not_found, server_error
 from services.organization_service import (
     create_organization,
     get_organization_by_id,
@@ -14,12 +14,10 @@ from services.organization_service import (
 )
 
 
-def handle_create(cognito_sub, body):
+def handle_create(body):
     """POST /organizations - Create a new organization."""
-    data, err = create_organization(cognito_sub, body)
+    data, err = create_organization(body)
     if err:
-        if "User not found" in err or "Access denied" in err:
-            return forbidden(err)
         if "required" in err or "cannot be empty" in err:
             return error(err)
         if "already exists" in err:
@@ -28,34 +26,28 @@ def handle_create(cognito_sub, body):
     return created(data)
 
 
-def handle_list(cognito_sub, query_params):
+def handle_list(query_params):
     """GET /organizations - List all organizations with pagination."""
-    data, err = list_organizations(cognito_sub, query_params)
+    data, err = list_organizations(query_params)
     if err:
-        if "User not found" in err or "Access denied" in err:
-            return forbidden(err)
         return server_error(err)
     return success(data)
 
 
-def handle_get(cognito_sub, org_id):
+def handle_get(org_id):
     """GET /organizations/{id} - Get an organization by ID."""
-    data, err = get_organization_by_id(cognito_sub, int(org_id))
+    data, err = get_organization_by_id(int(org_id))
     if err:
-        if "User not found" in err or "Access denied" in err:
-            return forbidden(err)
         if "not found" in err:
             return not_found(err)
         return server_error(err)
     return success(data)
 
 
-def handle_update(cognito_sub, org_id, body):
+def handle_update(org_id, body):
     """PUT /organizations/{id} - Update an organization."""
-    data, err = update_organization(cognito_sub, int(org_id), body)
+    data, err = update_organization(int(org_id), body)
     if err:
-        if "User not found" in err or "Access denied" in err:
-            return forbidden(err)
         if "not found" in err:
             return not_found(err)
         if "already exists" in err:
@@ -66,12 +58,10 @@ def handle_update(cognito_sub, org_id, body):
     return success(data)
 
 
-def handle_delete(cognito_sub, org_id):
+def handle_delete(org_id):
     """DELETE /organizations/{id} - Delete an organization."""
-    data, err = delete_organization(cognito_sub, int(org_id))
+    data, err = delete_organization(int(org_id))
     if err:
-        if "User not found" in err or "Access denied" in err:
-            return forbidden(err)
         if "not found" in err:
             return not_found(err)
         if "Cannot delete" in err:
@@ -80,11 +70,9 @@ def handle_delete(cognito_sub, org_id):
     return success(data)
 
 
-def handle_dropdown(cognito_sub, query_params):
+def handle_dropdown(query_params):
     """GET /organizations/dropdown - Get organizations for dropdown."""
-    data, err = get_all_organizations(cognito_sub)
+    data, err = get_all_organizations()
     if err:
-        if "User not found" in err or "Access denied" in err:
-            return forbidden(err)
         return server_error(err)
     return success(data)

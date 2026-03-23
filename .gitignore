@@ -1,10 +1,40 @@
-# SAM build folder
-.aws-sam/
-
-# Python
-__pycache__/
-*.pyc
-
-# virtual env
+# Python virtual environment
+.venv/
 venv/
+env/
+.env  
+env.json
+
+# Python cache
+**/__pycache__/
+*.pyc
+*.pyo
+
+# Environment variables
 .env
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# VSCode
+.vscode/
+
+# Logs
+*.log
+
+# Build / dist
+build/
+dist/
+*.egg-info/
+
+# AWS SAM & Local installations
+.aws-sam/
+sam-installation/
+sam-installation.zip
+aws-sam-cli-linux-x86_64.zip
+
+# Docker
+*.tar
+*.zip
+

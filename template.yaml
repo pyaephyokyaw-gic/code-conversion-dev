@@ -1,42 +1,112 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: SAM Template for Multi-Lambda with case-sensitive handler fix
+Description: SAM Template for Multi-Lambda with merged routes and dynamic parameters
 
 Globals:
   Function:
     Runtime: python3.11
-    # Matches your filename 'Lambda_function.py'
-    Handler: Lambda_function.lambda_handler 
+    Handler: lambda_function.lambda_handler
     Timeout: 30
+    Environment:
+      Variables:
+        DB_HOST: !Ref DBHost
+        DB_NAME: !Ref DBName
+        DB_USER: !Ref DBUser
+        DB_PASSWORD: !Ref DBPassword
+        DB_PORT: !Ref DBPort
+
+Parameters:
+  DBHost:
+    Type: String
+    Default: host.docker.internal
+  DBName:
+    Type: String
+    Default: local_dev_db
+  DBUser:
+    Type: String
+    Default: postgres
+  DBPassword:
+    Type: String
+    NoEcho: true
+    Default: postgres
+  DBPort:
+    Type: String
+    Default: '5432'
+  S3BucketName:
+    Type: String
+    Default: code-conversion-prompt-test
 
 Resources:
+
+  # ───────────── S3 BUCKETS ─────────────
+  PromptFilesBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub ojt-prompt-files-${AWS::AccountId}-${AWS::Region}
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders:
+              - '*'
+            AllowedMethods:
+              - GET
+              - PUT
+              - HEAD
+            AllowedOrigins:
+              - '*'
+            MaxAge: 3000
+
+  # ───────────── FUNCTIONS ─────────────
+
   UserFunction:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: ojt-user-management-dev
       CodeUri: user_management/
+      Events:
+        CreateUserAPI:
+          Type: Api
+          Properties:
+            Path: /organization/{orgId}/companies/{companyId}/users
+            Method: post
+        GetUsersAPI:
+          Type: Api
+          Properties:
+            Path: /organization/{orgId}/companies/{companyId}/users
+            Method: get
+        GetUserByIdAPI:
+          Type: Api
+          Properties:
+            Path: /organization/{orgId}/companies/{companyId}/users/{userId}
+            Method: get
+        UpdateUserAPI:
+          Type: Api
+          Properties:
+            Path: /organization/{orgId}/companies/{companyId}/users
+            Method: put
+        DeleteUserAPI:
+          Type: Api
+          Properties:
+            Path: /organization/{orgId}/companies/{companyId}/users/{userId}
+            Method: delete
 
   CompanyFunction:
-    Type: AWS::Serverless::Function 
+    Type: AWS::Serverless::Function
     Properties:
       FunctionName: ojt-company-management-dev
       CodeUri: company_management/
+      Events:
+        CompanyAPI:
+          Type: Api
+          Properties:
+            Path: /companies
+            Method: get
 
   OrganizationFunction:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: ojt-organization-management-dev
       CodeUri: organization_management/
-      Handler: lambda_function.lambda_handler
-      Environment:
-        Variables:
-          DB_HOST: !Ref DBHost
-          DB_NAME: !Ref DBName
-          DB_USER: !Ref DBUser
-          DB_PASSWORD: !Ref DBPassword
-          DB_PORT: !Ref DBPort
       Events:
-        # Organization CRUD
         CreateOrganization:
           Type: Api
           Properties:
@@ -62,7 +132,6 @@ Resources:
           Properties:
             Path: /organizations/{org_id}
             Method: DELETE
-        # Dropdown API
         OrganizationDropdown:
           Type: Api
           Properties:
@@ -74,21 +143,15 @@ Resources:
     Properties:
       FunctionName: ojt-prompt-management-dev
       CodeUri: prompt_management/
-      Handler: lambda_function.lambda_handler # override global (lowercase file)
       Policies:
         - S3CrudPolicy:
             BucketName: !Ref S3BucketName
       Environment:
         Variables:
-          DB_HOST: !Ref DBHost
-          DB_NAME: !Ref DBName
-          DB_USER: !Ref DBUser
-          DB_PASSWORD: !Ref DBPassword
-          DB_PORT: !Ref DBPort
+          # DB vars are inherited from Globals, adding S3 specific vars here
           S3_BUCKET_NAME: !Ref S3BucketName
           AWS_REGION_NAME: !Ref AWS::Region
       Events:
-        # Prompt CRUD
         CreatePrompt:
           Type: Api
           Properties:
@@ -114,7 +177,6 @@ Resources:
           Properties:
             Path: /prompts/{prompt_id}
             Method: DELETE
-        # File operations
         GetPromptUploadUrl:
           Type: Api
           Properties:
@@ -125,17 +187,49 @@ Resources:
           Properties:
             Path: /prompts/{prompt_id}/file-content
             Method: GET
-        # Dropdown API
-        GetPromptTypesDropdown:
-          Type: Api
-          Properties:
-            Path: /prompts/types
-            Method: GET
 
   ConversionFunction:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: ojt-conversion-management-dev
       CodeUri: conversion_management/
-   
-  
+      Policies:
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt ConversionQueue.QueueName
+      Environment:
+        Variables:
+          CONVERSION_QUEUE_URL: !Ref ConversionQueue
+      Events:
+        GetConversionsAPI:
+          Type: Api
+          Properties:
+            Path: /conversions
+            Method: get
+        InsertConversionAPI:
+          Type: Api
+          Properties:
+            Path: /conversion
+            Method: post
+        ConversionQueueEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt ConversionQueue.Arn
+            BatchSize: 10
+
+  ConversionQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: ojt-conversion-queue-dev
+
+  DBInitFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: ojt-db-init-dev
+      CodeUri: user_management/
+      Handler: db_init.lambda_handler
+      Events:
+        InitApi:
+          Type: Api
+          Properties:
+            Path: /init-db
+            Method: get

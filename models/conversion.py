@@ -1,5 +1,5 @@
 from sqlalchemy.orm import mapped_column, Mapped
-from sqlalchemy import String, ForeignKey, DateTime, Enum as SQLEnum
+from sqlalchemy import String, ForeignKey, DateTime, func, Enum as SQLEnum
 from .base import Base
 from datetime import datetime
 from enum import Enum
@@ -20,10 +20,10 @@ class Conversion(Base):
     prompt_id: Mapped[int] = mapped_column(
         ForeignKey("prompts.id"), index=True)
     input_file: Mapped[str] = mapped_column(String)
-    output_file: Mapped[str] = mapped_column(String)
+    output_file: Mapped[str] = mapped_column(String, nullable=True)
     status: Mapped[int] = mapped_column(
         SQLEnum(ConversionStatus, name="conversion_status_enum"))
     fail_log: Mapped[str] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=datetime.now)
+        DateTime, server_default=func.now())
     completed_at: Mapped[datetime] = mapped_column(DateTime)

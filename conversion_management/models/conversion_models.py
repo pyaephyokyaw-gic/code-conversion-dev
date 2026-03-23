@@ -7,7 +7,7 @@ from typing import Optional
 class BaseConversion(BaseModel):
     id: int
     promptType: str
-    date: datetime
+    date: str
     status: str  # 'success' | 'failed'
     s3Input: Optional[str]
 
@@ -28,4 +28,4 @@ class ConversionLog(BaseConversion):
 class Conversion(BaseConversion):
     tokenUsage: int
     s3Output: Optional[str]
-    processingTime: datetime
+    processingTime: Optional[float]
