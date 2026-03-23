@@ -1,3 +1,16 @@
+httpx
+python-jose[cryptography]
+
+# Web Framework
+fastapi
+uvicorn[standard]
+
+# Database Toolkit (ORM)
+sqlalchemy>=2.0.0
+
+# Environment Variable Management
+python-dotenv
+pydantic-settings
+
 psycopg2-binary
 boto3
-python-dotenv
